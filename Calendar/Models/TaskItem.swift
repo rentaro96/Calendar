@@ -10,10 +10,12 @@ import Foundation
 struct TaskItem: Codable, Identifiable {
     var id: UUID = UUID()
     var title: String
-    var subject: String
-    var dueDate: Date
+    var category: FixedScheduleCategory
+    var targetDate: Date
     var requiredMinutes: Int
     var canSplit: Bool
+    var splitCount: Int
     var priority: Int
     var memo: String
+    var isCompleted: Bool = false
 }

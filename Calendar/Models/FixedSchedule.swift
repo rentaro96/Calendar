@@ -10,7 +10,7 @@ import Foundation
 struct FixedSchedule: Codable, Identifiable {
     var id: UUID = UUID()
     var title: String
-    var weekday: Int
+    var weekdays: [Int]
     var startHour: Int
     var startMinute: Int
     var endHour: Int

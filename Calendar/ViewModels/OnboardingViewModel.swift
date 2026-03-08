@@ -10,28 +10,19 @@ internal import Combine
 internal import SwiftUI
 
 final class OnboardingViewModel: ObservableObject {
-    // MARK: - UserProfile入力用
     @Published var wakeUpHour: Int = 6
     @Published var wakeUpMinute: Int = 30
 
     @Published var sleepHour: Int = 23
     @Published var sleepMinute: Int = 0
 
-    @Published var focusStartHour: Int = 19
-    @Published var focusEndHour: Int = 21
-
-    @Published var weakStartHour: Int = 22
-    @Published var weakEndHour: Int = 23
-
-    @Published var preferredStudyMinutes: Int = 30
     @Published var calendarType: CalendarType = .apple
 
-    // MARK: - FixedSchedule入力用
     @Published var fixedSchedules: [FixedSchedule] = []
 
     func addFixedSchedule(
         title: String,
-        weekday: Int,
+        weekdays: [Int],
         startHour: Int,
         startMinute: Int,
         endHour: Int,
@@ -40,7 +31,7 @@ final class OnboardingViewModel: ObservableObject {
     ) {
         let newSchedule = FixedSchedule(
             title: title,
-            weekday: weekday,
+            weekdays: weekdays,
             startHour: startHour,
             startMinute: startMinute,
             endHour: endHour,
@@ -61,11 +52,6 @@ final class OnboardingViewModel: ObservableObject {
             wakeUpMinute: wakeUpMinute,
             sleepHour: sleepHour,
             sleepMinute: sleepMinute,
-            focusStartHour: focusStartHour,
-            focusEndHour: focusEndHour,
-            weakStartHour: weakStartHour,
-            weakEndHour: weakEndHour,
-            preferredStudyMinutes: preferredStudyMinutes,
             calendarType: calendarType
         )
 

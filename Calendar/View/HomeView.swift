@@ -1,118 +1,156 @@
-//
-//  HomeView.swift
-//  SmartSchedulerApp
-//
-//  Created by 鈴木廉太郎 on 2026/03/06.
-//
-
 internal import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
 
-    @State private var profile: UserProfile?
-    @State private var schedules: [FixedSchedule] = []
+    @State private var tasks: [TaskItem] = []
+
+    @State private var showTaskInputView = false
+    @State private var showSettingsView = false
 
     var body: some View {
         NavigationStack {
             List {
-                Section("プロフィール") {
-                    if let profile {
-                        Text("起床時間: \(timeText(hour: profile.wakeUpHour, minute: profile.wakeUpMinute))")
-                        Text("就寝時間: \(timeText(hour: profile.sleepHour, minute: profile.sleepMinute))")
-                        Text("集中しやすい時間: \(profile.focusStartHour)時〜\(profile.focusEndHour)時")
-                        Text("苦手な時間: \(profile.weakStartHour)時〜\(profile.weakEndHour)時")
-                        Text("おすすめ勉強時間: \(profile.preferredStudyMinutes)分")
-                        Text("カレンダー: \(calendarText(profile.calendarType))")
-                    } else {
-                        Text("プロフィールが保存されていません")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("固定予定") {
-                    if schedules.isEmpty {
-                        Text("固定予定がありません")
+                Section("やること一覧") {
+                    if tasks.isEmpty {
+                        Text("まだやることがありません")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(schedules) { schedule in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(schedule.title)
-                                    .font(.headline)
+                        ForEach(tasks.sorted(by: { $0.targetDate < $1.targetDate })) { task in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(task.title)
+                                        .font(.headline)
 
-                                Text("\(weekdayText(schedule.weekday)) \(timeText(hour: schedule.startHour, minute: schedule.startMinute))〜\(timeText(hour: schedule.endHour, minute: schedule.endMinute))")
+                                    Spacer()
+
+                                    Text(categoryText(task.category))
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(.blue.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+
+                                Text("完成したい日: \(dateTimeText(task.targetDate))")
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
 
-                                Text(categoryText(schedule.category))
-                                    .font(.caption)
-                                    .foregroundStyle(.blue)
+                                Text("必要時間: \(task.requiredMinutes)分")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                if task.canSplit {
+                                    Text("分割: \(task.splitCount)回で進めたい")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text("分割: しない")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Text("優先度: \(starText(task.priority))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                if !task.memo.isEmpty {
+                                    Text("メモ: \(task.memo)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.top, 2)
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
+                        .onDelete(perform: deleteTasks)
                     }
                 }
 
                 Section("次にやること") {
-                    Text("次は TaskInputView を作って課題を追加できるようにする")
-                    Text("そのあと FreeTimeFinder と ScheduleEngine を作る")
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        LocalStorageService.shared.clearAll()
-                        appState.resetOnboarding()
-                    } label: {
-                        Text("初期設定をやり直す")
-                    }
+                    Text("次は空き時間を探す FreeTimeFinder を作る")
+                    Text("そのあと ScheduleEngine で自動配置につなげる")
                 }
             }
             .navigationTitle("ホーム")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettingsView = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                    }
+                }
+            }
             .onAppear {
                 loadData()
+            }
+            .sheet(isPresented: $showTaskInputView) {
+                TaskInputView {
+                    loadData()
+                }
+            }
+            .sheet(isPresented: $showSettingsView) {
+                SettingsView()
+                    .environmentObject(appState)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    showTaskInputView = true
+                } label: {
+                    HStack {
+                        Image(systemName: "plus")
+                        Text("やることを追加")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .background(.ultraThinMaterial)
             }
         }
     }
 
     private func loadData() {
-        profile = LocalStorageService.shared.loadUserProfile()
-        schedules = LocalStorageService.shared.loadFixedSchedules()
+        tasks = LocalStorageService.shared.loadTaskItems()
     }
 
-    private func weekdayText(_ weekday: Int) -> String {
-        switch weekday {
-        case 1: return "日"
-        case 2: return "月"
-        case 3: return "火"
-        case 4: return "水"
-        case 5: return "木"
-        case 6: return "金"
-        case 7: return "土"
-        default: return "-"
-        }
+    private func deleteTasks(at offsets: IndexSet) {
+        let sortedTasks = tasks.sorted(by: { $0.targetDate < $1.targetDate })
+        var newTasks = sortedTasks
+        newTasks.remove(atOffsets: offsets)
+        tasks = newTasks
+        LocalStorageService.shared.saveTaskItems(newTasks)
     }
 
-    private func timeText(hour: Int, minute: Int) -> String {
-        String(format: "%02d:%02d", hour, minute)
+    private func dateTimeText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "yyyy/MM/dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func starText(_ value: Int) -> String {
+        String(repeating: "★", count: value) + String(repeating: "☆", count: max(0, 5 - value))
     }
 
     private func categoryText(_ category: FixedScheduleCategory) -> String {
         switch category {
-        case .school:
-            return "学校"
-        case .cram:
-            return "塾"
-        case .club:
-            return "部活"
-        case .other:
-            return "その他"
-        }
-    }
-
-    private func calendarText(_ type: CalendarType) -> String {
-        switch type {
-        case .apple:
-            return "Apple"
-        case .google:
-            return "Google"
+        case .study:
+            return "勉強"
+        case .work:
+            return "仕事"
+        case .personal:
+            return "用事"
+        case .hobby:
+            return "趣味"
+        case .family:
+            return "家族"
+        case .exercise:
+            return "運動"
         }
     }
 }

@@ -12,16 +12,34 @@ struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
 
     @State private var newTitle: String = ""
-    @State private var newWeekday: Int = 2
+    @State private var selectedWeekdays: Set<Int> = []
     @State private var newStartHour: Int = 8
     @State private var newStartMinute: Int = 30
     @State private var newEndHour: Int = 15
     @State private var newEndMinute: Int = 30
-    @State private var newCategory: FixedScheduleCategory = .school
+    @State private var newCategory: FixedScheduleCategory = .study
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("使うカレンダー")
+                            .font(.headline)
+
+                        Text("連携したいカレンダーを選ぶ")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Picker("カレンダー種類", selection: $viewModel.calendarType) {
+                            Text("Appleカレンダー").tag(CalendarType.apple)
+                            Text("Googleカレンダー").tag(CalendarType.google)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(.vertical, 8)
+                }
+
                 Section("生活リズム") {
                     HStack {
                         Text("起床時間")
@@ -60,90 +78,29 @@ struct OnboardingView: View {
                     }
                 }
 
-                Section("集中しやすい時間") {
-                    HStack {
-                        Text("開始")
-                        Spacer()
-                        Picker("集中開始", selection: $viewModel.focusStartHour) {
-                            ForEach(0..<24, id: \.self) { hour in
-                                Text("\(hour)時").tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    HStack {
-                        Text("終了")
-                        Spacer()
-                        Picker("集中終了", selection: $viewModel.focusEndHour) {
-                            ForEach(0..<24, id: \.self) { hour in
-                                Text("\(hour)時").tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                }
-
-                Section("苦手な時間") {
-                    HStack {
-                        Text("開始")
-                        Spacer()
-                        Picker("苦手開始", selection: $viewModel.weakStartHour) {
-                            ForEach(0..<24, id: \.self) { hour in
-                                Text("\(hour)時").tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    HStack {
-                        Text("終了")
-                        Spacer()
-                        Picker("苦手終了", selection: $viewModel.weakEndHour) {
-                            ForEach(0..<24, id: \.self) { hour in
-                                Text("\(hour)時").tag(hour)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                }
-
-                Section("勉強設定") {
-                    Picker("1回のおすすめ勉強時間", selection: $viewModel.preferredStudyMinutes) {
-                        ForEach([15, 20, 30, 45, 60, 90], id: \.self) { minute in
-                            Text("\(minute)分").tag(minute)
-                        }
-                    }
-
-                    Picker("カレンダー種類", selection: $viewModel.calendarType) {
-                        Text("Apple").tag(CalendarType.apple)
-                        Text("Google").tag(CalendarType.google)
-                    }
-                }
-
                 Section("固定予定を追加") {
-                    TextField("予定名（学校、塾、部活など）", text: $newTitle)
-
-                    Picker("曜日", selection: $newWeekday) {
-                        Text("日").tag(1)
-                        Text("月").tag(2)
-                        Text("火").tag(3)
-                        Text("水").tag(4)
-                        Text("木").tag(5)
-                        Text("金").tag(6)
-                        Text("土").tag(7)
-                    }
+                    TextField("予定名（学校、仕事、病院、ジムなど）", text: $newTitle)
 
                     Picker("カテゴリ", selection: $newCategory) {
-                        Text("学校").tag(FixedScheduleCategory.school)
-                        Text("塾").tag(FixedScheduleCategory.cram)
-                        Text("部活").tag(FixedScheduleCategory.club)
-                        Text("その他").tag(FixedScheduleCategory.other)
+                        Text("勉強").tag(FixedScheduleCategory.study)
+                        Text("仕事").tag(FixedScheduleCategory.work)
+                        Text("用事").tag(FixedScheduleCategory.personal)
+                        Text("趣味").tag(FixedScheduleCategory.hobby)
+                        Text("家族").tag(FixedScheduleCategory.family)
+                        Text("運動").tag(FixedScheduleCategory.exercise)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("曜日を選択（複数可）")
+                            .font(.subheadline)
+
+                        weekdaySelectionGrid
                     }
 
                     HStack {
                         Text("開始")
                         Spacer()
+
                         Picker("開始時", selection: $newStartHour) {
                             ForEach(0..<24, id: \.self) { hour in
                                 Text("\(hour)時").tag(hour)
@@ -162,6 +119,7 @@ struct OnboardingView: View {
                     HStack {
                         Text("終了")
                         Spacer()
+
                         Picker("終了時", selection: $newEndHour) {
                             ForEach(0..<24, id: \.self) { hour in
                                 Text("\(hour)時").tag(hour)
@@ -178,13 +136,14 @@ struct OnboardingView: View {
                     }
 
                     Button("固定予定を追加") {
-                        guard !newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                            return
-                        }
+                        let trimmedTitle = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        guard !trimmedTitle.isEmpty else { return }
+                        guard !selectedWeekdays.isEmpty else { return }
 
                         viewModel.addFixedSchedule(
-                            title: newTitle,
-                            weekday: newWeekday,
+                            title: trimmedTitle,
+                            weekdays: selectedWeekdays.sorted(),
                             startHour: newStartHour,
                             startMinute: newStartMinute,
                             endHour: newEndHour,
@@ -193,6 +152,7 @@ struct OnboardingView: View {
                         )
 
                         newTitle = ""
+                        selectedWeekdays = []
                     }
                 }
 
@@ -206,7 +166,7 @@ struct OnboardingView: View {
                                 Text(schedule.title)
                                     .font(.headline)
 
-                                Text("\(weekdayText(schedule.weekday)) \(timeText(hour: schedule.startHour, minute: schedule.startMinute))〜\(timeText(hour: schedule.endHour, minute: schedule.endMinute))")
+                                Text("\(weekdayListText(schedule.weekdays))  \(timeText(hour: schedule.startHour, minute: schedule.startMinute))〜\(timeText(hour: schedule.endHour, minute: schedule.endMinute))")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
 
@@ -224,13 +184,56 @@ struct OnboardingView: View {
                         viewModel.saveAll()
                         appState.completeOnboarding()
                     } label: {
-                        Text("保存して始める")
+                        Text("保存する")
                             .frame(maxWidth: .infinity)
                     }
                 }
             }
             .navigationTitle("初期設定")
         }
+    }
+
+    private var weekdaySelectionGrid: some View {
+        HStack(spacing: 8) {
+            ForEach(weekdayItems, id: \.value) { item in
+                Button {
+                    toggleWeekday(item.value)
+                } label: {
+                    Text(item.label)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(selectedWeekdays.contains(item.value) ? Color.blue : Color.gray.opacity(0.15))
+                        .foregroundStyle(selectedWeekdays.contains(item.value) ? Color.white : Color.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var weekdayItems: [(label: String, value: Int)] {
+        [
+            ("日", 1),
+            ("月", 2),
+            ("火", 3),
+            ("水", 4),
+            ("木", 5),
+            ("金", 6),
+            ("土", 7)
+        ]
+    }
+
+    private func toggleWeekday(_ weekday: Int) {
+        if selectedWeekdays.contains(weekday) {
+            selectedWeekdays.remove(weekday)
+        } else {
+            selectedWeekdays.insert(weekday)
+        }
+    }
+
+    private func weekdayListText(_ weekdays: [Int]) -> String {
+        weekdays.map { weekdayText($0) }.joined(separator: "・")
     }
 
     private func weekdayText(_ weekday: Int) -> String {
@@ -252,14 +255,18 @@ struct OnboardingView: View {
 
     private func categoryText(_ category: FixedScheduleCategory) -> String {
         switch category {
-        case .school:
-            return "学校"
-        case .cram:
-            return "塾"
-        case .club:
-            return "部活"
-        case .other:
-            return "その他"
+        case .study:
+            return "勉強"
+        case .work:
+            return "仕事"
+        case .personal:
+            return "用事"
+        case .hobby:
+            return "趣味"
+        case .family:
+            return "家族"
+        case .exercise:
+            return "運動"
         }
     }
 }

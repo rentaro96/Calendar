@@ -7,16 +7,18 @@
 
 import Foundation
 
-enum CalendarType: String, Codable {
+enum CalendarType: String, Codable, CaseIterable {
     case apple
     case google
 }
 
-enum FixedScheduleCategory: String, Codable {
-    case school
-    case cram
-    case club
-    case other
+enum FixedScheduleCategory: String, Codable, CaseIterable {
+    case study
+    case work
+    case personal
+    case hobby
+    case family
+    case exercise
 }
 
 enum TimeType: String, Codable {

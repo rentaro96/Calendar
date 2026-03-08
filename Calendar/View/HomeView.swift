@@ -86,9 +86,9 @@ struct HomeView: View {
                 loadData()
             }
             .sheet(isPresented: $showTaskInputView) {
-                TaskInputView {
+                TaskInputView(onSave: {
                     loadData()
-                }
+                })
             }
             .sheet(isPresented: $showSettingsView) {
                 SettingsView()

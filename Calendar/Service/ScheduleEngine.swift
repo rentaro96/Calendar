@@ -60,18 +60,25 @@ final class ScheduleEngine {
         }
 
         for date in candidateDates {
-            let freeSlots = freeSlotsForDay(
+            let rawFreeSlots = freeSlotsForDay(
                 date: date,
                 profile: profile,
                 schedules: schedules,
                 additionalBusySlots: additionalBusySlots
             )
 
-            guard let matchedSlot = freeSlots.first(where: { $0.durationMinutes >= task.requiredMinutes }) else {
+            let deadlineClippedSlots = clippedSlotsByDeadline(rawFreeSlots, for: date, task: task)
+            let freeSlots = clippedPastSlotsIfNeeded(deadlineClippedSlots, for: date)
+
+            let candidates = freeSlots.filter { $0.durationMinutes >= task.requiredMinutes }
+            guard let matchedSlot = candidates.randomElement() else {
                 continue
             }
 
-            let startDate = matchedSlot.start
+            guard let startDate = randomStartDate(in: matchedSlot, neededMinutes: task.requiredMinutes) else {
+                continue
+            }
+
             let endDate = calendar.date(byAdding: .minute, value: task.requiredMinutes, to: startDate) ?? matchedSlot.end
 
             let block = ScheduledBlock(
@@ -127,12 +134,15 @@ final class ScheduleEngine {
         for date in candidateDates {
             guard sessionIndex < sessionMinutesList.count else { break }
 
-            let freeSlots = freeSlotsForDay(
+            let rawFreeSlots = freeSlotsForDay(
                 date: date,
                 profile: profile,
                 schedules: schedules,
                 additionalBusySlots: additionalBusySlots
             )
+
+            let deadlineClippedSlots = clippedSlotsByDeadline(rawFreeSlots, for: date, task: task)
+            let freeSlots = clippedPastSlotsIfNeeded(deadlineClippedSlots, for: date)
 
             let neededMinutes = sessionMinutesList[sessionIndex]
 
@@ -281,6 +291,24 @@ final class ScheduleEngine {
 
         return dates
     }
+    
+    private func clippedPastSlotsIfNeeded(
+        _ slots: [TimeSlot],
+        for date: Date
+    ) -> [TimeSlot] {
+        let calendar = Calendar.current
+        let now = Date()
+
+        guard calendar.isDate(date, inSameDayAs: now) else {
+            return slots
+        }
+
+        return slots.compactMap { slot in
+            let clippedStart = maxDate(slot.start, now)
+            guard clippedStart < slot.end else { return nil }
+            return TimeSlot(start: clippedStart, end: slot.end)
+        }
+    }
 
     private func splitMinutes(total: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
@@ -325,5 +353,43 @@ final class ScheduleEngine {
 
     private func minDate(_ lhs: Date, _ rhs: Date) -> Date {
         lhs < rhs ? lhs : rhs
+    }
+    
+    private func clippedSlotsByDeadline(
+        _ slots: [TimeSlot],
+        for date: Date,
+        task: TaskItem
+    ) -> [TimeSlot] {
+        let calendar = Calendar.current
+
+        guard calendar.isDate(date, inSameDayAs: task.targetDate) else {
+            return slots
+        }
+
+        return slots.compactMap { slot in
+            let clippedEnd = minDate(slot.end, task.targetDate)
+            guard slot.start < clippedEnd else { return nil }
+            return TimeSlot(start: slot.start, end: clippedEnd)
+        }
+    }
+    
+    private func randomStartDate(
+        in slot: TimeSlot,
+        neededMinutes: Int
+    ) -> Date? {
+        let calendar = Calendar.current
+        let latestStart = calendar.date(byAdding: .minute, value: -neededMinutes, to: slot.end)
+
+        guard let latestStart, slot.start <= latestStart else {
+            return nil
+        }
+
+        let totalMinutes = Int(latestStart.timeIntervalSince(slot.start) / 60)
+        guard totalMinutes >= 0 else { return nil }
+
+        // 5分単位でランダム
+        let stepCount = totalMinutes / 5
+        let randomStep = Int.random(in: 0...max(0, stepCount))
+        return calendar.date(byAdding: .minute, value: randomStep * 5, to: slot.start)
     }
 }

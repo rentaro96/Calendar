@@ -2,26 +2,29 @@ internal import SwiftUI
 
 struct TaskInputView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = TaskInputViewModel()
+        @StateObject private var viewModel = TaskInputViewModel()
 
-    @State private var showValidationAlert = false
-    @State private var validationMessage = "入力内容を確認してね。"
+        @State private var showValidationAlert = false
+        @State private var validationMessage = "入力内容を確認してね。"
 
-    @State private var profile: UserProfile?
-    @State private var fixedSchedules: [FixedSchedule] = []
+        @State private var profile: UserProfile?
+        @State private var fixedSchedules: [FixedSchedule] = []
 
-    @State private var draftTask: TaskItem?
-    @State private var generatedCandidates: [DateCandidate] = []
-    @State private var generatedBlocks: [ScheduledBlock] = []
+        @State private var draftTask: TaskItem?
+        @State private var generatedCandidates: [DateCandidate] = []
+        //@State private var generatedBlocks: [ScheduledBlock] = []
+    
+    @State private var previewPayload: SchedulePreviewPayload?
 
-    @State private var showCandidateSelectionView = false
-    @State private var showSchedulePreviewView = false
-    @State private var isPreparingSchedule = false
+        @State private var showCandidateSelectionView = false
+        //@State private var showSchedulePreviewView = false
+        @State private var isPreparingSchedule = false
+        @State private var selectedDateForPreview: Date? = nil
 
-    var onSave: (() -> Void)?
+        var onSave: (() -> Void)?
 
-    private let candidateGenerator = DateCandidateGenerator()
-    private let scheduleEngine = ScheduleEngine()
+        private let candidateGenerator = DateCandidateGenerator()
+        private let scheduleEngine = ScheduleEngine()
 
     var body: some View {
         NavigationStack {
@@ -130,20 +133,19 @@ struct TaskInputView: View {
                         task: draftTask,
                         candidates: generatedCandidates
                     ) { selectedDate in
+                        selectedDateForPreview = selectedDate
                         makePreviewSchedule(for: draftTask, selectedDate: selectedDate)
                     }
                 }
             }
-            .fullScreenCover(isPresented: $showSchedulePreviewView) {
-                if let draftTask {
-                    SchedulePreviewView(
-                        task: draftTask,
-                        scheduledBlocks: generatedBlocks
-                    ) {
-                        saveDraftTaskToLocal()
-                        onSave?()
-                        dismiss()
-                    }
+            .fullScreenCover(item: $previewPayload) { payload in
+                SchedulePreviewView(
+                    task: payload.task,
+                    scheduledBlocks: payload.blocks
+                ) {
+                    saveDraftTaskToLocal()
+                    onSave?()
+                    dismiss()
                 }
             }
         }
@@ -220,9 +222,13 @@ struct TaskInputView: View {
             additionalBusySlots: []
         )
 
-        generatedBlocks = blocks
+        print("blocks count:", blocks.count)
+        for block in blocks {
+            print("block:", block.title, block.startDate, block.endDate)
+        }
+
         isPreparingSchedule = false
-        showSchedulePreviewView = true
+        previewPayload = SchedulePreviewPayload(task: task, blocks: blocks)
     }
 
     private func saveDraftTaskToLocal() {
@@ -254,4 +260,12 @@ struct TaskInputView: View {
             }
         }
     }
+}
+
+import Foundation
+
+struct SchedulePreviewPayload: Identifiable {
+    let id = UUID()
+    let task: TaskItem
+    let blocks: [ScheduledBlock]
 }
